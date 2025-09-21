@@ -3,50 +3,118 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; margin: 16px; max-width:600px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #6dd5fa, #2980b9);
+    }
+    .container {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+      max-width: 700px;
+      width: 100%;
+      text-align: center;
+    }
+    h2 {
+      color: #1976d2;
+      margin-bottom: 16px;
+    }
     .hidden { display: none; }
-    label { display:block; margin-top:12px; font-weight:600; }
-    select, input { padding:8px; margin-top:6px; width:100%; box-sizing:border-box; }
-    button { margin-top:14px; padding:10px; width:100%; background:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; }
-    button.secondary { background:#4caf50; width:auto; padding:6px 12px; font-size:14px; margin-left:6px; }
-    p.msg { margin-top:10px; color:#d32f2f; }
-    table { width:100%; border-collapse: collapse; margin-top:12px; }
-    th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+    label { display:block; margin-top:12px; font-weight:600; text-align: left; }
+    select, input {
+      padding:10px;
+      margin-top:6px;
+      width:100%;
+      border:1px solid #ccc;
+      border-radius:6px;
+      box-sizing:border-box;
+    }
+    button {
+      margin-top:16px;
+      padding:12px;
+      width:100%;
+      background:#1976d2;
+      color:white;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:16px;
+      transition: background 0.3s;
+    }
+    button:hover { background:#125ea5; }
+    button.secondary {
+      background:#4caf50;
+      width:auto;
+      padding:8px 16px;
+      font-size:14px;
+      margin-left:6px;
+    }
+    button.secondary:hover { background:#3b9142; }
+    p.msg {
+      margin-top:10px;
+      font-weight:600;
+    }
+    p.msg.error { color:#d32f2f; }
+    p.msg.success {
+      color:#2e7d32;
+      background:#c8e6c9;
+      padding:8px;
+      border-radius:6px;
+      margin-top:14px;
+    }
+    table {
+      width:100%;
+      border-collapse: collapse;
+      margin-top:16px;
+    }
+    th, td {
+      border:1px solid #ddd;
+      padding:10px;
+      text-align:left;
+    }
     th { background:#f5f5f5; }
     .status-available { color: green; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h2>Find Available Bodaboda Riders</h2>
+  <div class="container">
+    <h2>Find Available Bodaboda Riders</h2>
 
-  <div id="searchSection">
-    <label>County</label>
-    <select id="county" onchange="onCountyChange()"><option value="">Loading...</option></select>
+    <div id="searchSection">
+      <label>County</label>
+      <select id="county" onchange="onCountyChange()"><option value="">Loading...</option></select>
 
-    <label>Constituency</label>
-    <select id="constituency" onchange="onConstituencyChange()"><option value="">Select county first</option></select>
+      <label>Constituency</label>
+      <select id="constituency" onchange="onConstituencyChange()"><option value="">Select county first</option></select>
 
-    <label>Ward</label>
-    <select id="ward"><option value="">Select constituency first</option></select>
+      <label>Ward</label>
+      <select id="ward"><option value="">Select constituency first</option></select>
 
-    <button onclick="search()">Search</button>
-    <p id="searchMsg" class="msg"></p>
-  </div>
+      <button onclick="search()">Search</button>
+      <p id="searchMsg" class="msg"></p>
+    </div>
 
-  <div id="resultsSection" class="hidden">
-    <h3>Available Riders</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Phone</th>
-          <th>Stage</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="resultsBody"></tbody>
-    </table>
+    <div id="resultsSection" class="hidden">
+      <h3>Available Riders</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Stage</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -124,16 +192,21 @@
       tbody.innerHTML = '';
 
       if (!county || !constituency || !ward) {
-        msg.innerText = 'Please select County, Constituency, and Ward.';
+        msg.className = "msg error";
+        msg.innerText = '⚠️ Please select County, Constituency, and Ward.';
         return;
       }
 
       const results = await fetchFromWorker({ func: 'searchDrivers', county, constituency, ward });
       if (!results || !results.length) {
-        msg.innerText = 'No available riders found in this area.';
+        msg.className = "msg error";
+        msg.innerText = '❌ No available riders found in this area.';
         document.getElementById('resultsSection').classList.add('hidden');
         return;
       }
+
+      msg.className = "msg success";
+      msg.innerText = '✅ Riders found! Scroll down to see details.';
 
       document.getElementById('resultsSection').classList.remove('hidden');
       results.forEach(r => {
@@ -144,7 +217,7 @@
         tr.appendChild(nameTd);
 
         const phoneTd = document.createElement('td');
-        phoneTd.textContent = r.Phone;
+        phoneTd.textContent = r.Phone.startsWith("0") ? r.Phone : "0" + r.Phone;
         tr.appendChild(phoneTd);
 
         const stageTd = document.createElement('td');
@@ -185,7 +258,8 @@
         customerPhone,
         customerStage
       });
-      alert(res.message);
+
+      alert("🎉 " + res.message);
     }
 
     window.onload = loadCounties;
