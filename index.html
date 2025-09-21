@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; max-width:600px; }
+    .hidden { display: none; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    select, input { padding:8px; margin-top:6px; width:100%; box-sizing:border-box; }
+    button { margin-top:14px; padding:10px; width:100%; background:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; }
+    button.secondary { background:#4caf50; width:auto; padding:6px 12px; font-size:14px; margin-left:6px; }
+    p.msg { margin-top:10px; color:#d32f2f; }
+    table { width:100%; border-collapse: collapse; margin-top:12px; }
+    th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+    th { background:#f5f5f5; }
+    .status-available { color: green; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Find Available Bodaboda Riders</h2>
+
+  <div id="searchSection">
+    <label>County</label>
+    <select id="county" onchange="onCountyChange()"><option value="">Loading...</option></select>
+
+    <label>Constituency</label>
+    <select id="constituency" onchange="onConstituencyChange()"><option value="">Select county first</option></select>
+
+    <label>Ward</label>
+    <select id="ward"><option value="">Select constituency first</option></select>
+
+    <button onclick="search()">Search</button>
+    <p id="searchMsg" class="msg"></p>
+  </div>
+
+  <div id="resultsSection" class="hidden">
+    <h3>Available Riders</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Stage</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://young-salad-eb1a.ev-dmaundu.workers.dev/';
+
+    async function fetchFromWorker(params = {}) {
+      const url = new URL(WORKER_URL);
+      Object.keys(params).forEach(key => url.searchParams.set(key, params[key]));
+      const res = await fetch(url.toString());
+      return await res.json();
+    }
+
+    async function loadCounties() {
+      const counties = await fetchFromWorker({ func: 'getCounties' });
+      const sel = document.getElementById('county');
+      sel.innerHTML = '<option value="">-- Select County --</option>';
+      counties.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function onCountyChange() {
+      const county = document.getElementById('county').value;
+      const consSel = document.getElementById('constituency');
+      consSel.innerHTML = '<option>Loading...</option>';
+      document.getElementById('ward').innerHTML = '<option value="">Select constituency first</option>';
+
+      if (!county) {
+        consSel.innerHTML = '<option value="">Select county first</option>';
+        return;
+      }
+
+      const consts = await fetchFromWorker({ func: 'getConstituencies', county });
+      consSel.innerHTML = '<option value="">-- Select Constituency --</option>';
+      consts.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        consSel.appendChild(opt);
+      });
+    }
+
+    async function onConstituencyChange() {
+      const county = document.getElementById('county').value;
+      const constituency = document.getElementById('constituency').value;
+      const wardSel = document.getElementById('ward');
+      wardSel.innerHTML = '<option>Loading...</option>';
+
+      if (!county || !constituency) {
+        wardSel.innerHTML = '<option value="">Select constituency first</option>';
+        return;
+      }
+
+      const wards = await fetchFromWorker({ func: 'getWards', county, constituency });
+      wardSel.innerHTML = '<option value="">-- Select Ward --</option>';
+      wards.forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = w;
+        wardSel.appendChild(opt);
+      });
+    }
+
+    async function search() {
+      const county = document.getElementById('county').value;
+      const constituency = document.getElementById('constituency').value;
+      const ward = document.getElementById('ward').value;
+      const msg = document.getElementById('searchMsg');
+      const tbody = document.getElementById('resultsBody');
+
+      msg.innerText = '';
+      tbody.innerHTML = '';
+
+      if (!county || !constituency || !ward) {
+        msg.innerText = 'Please select County, Constituency, and Ward.';
+        return;
+      }
+
+      const results = await fetchFromWorker({ func: 'searchDrivers', county, constituency, ward });
+      if (!results || !results.length) {
+        msg.innerText = 'No available riders found in this area.';
+        document.getElementById('resultsSection').classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('resultsSection').classList.remove('hidden');
+      results.forEach(r => {
+        const tr = document.createElement('tr');
+
+        const nameTd = document.createElement('td');
+        nameTd.textContent = r.Name;
+        tr.appendChild(nameTd);
+
+        const phoneTd = document.createElement('td');
+        phoneTd.textContent = r.Phone;
+        tr.appendChild(phoneTd);
+
+        const stageTd = document.createElement('td');
+        stageTd.textContent = r.Stage;
+        tr.appendChild(stageTd);
+
+        const statusTd = document.createElement('td');
+        statusTd.textContent = r.Status;
+        if (r.Status === 'Available') statusTd.classList.add('status-available');
+        tr.appendChild(statusTd);
+
+        const actionTd = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.textContent = 'Send FREE Request SMS Now';
+        btn.classList.add('secondary');
+        btn.onclick = () => sendRequest(r);
+        actionTd.appendChild(btn);
+        tr.appendChild(actionTd);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function sendRequest(driver) {
+      const customerName = prompt("Enter your Name:");
+      if (!customerName) return alert("Name is required.");
+
+      const customerPhone = prompt("Enter your Phone Number:");
+      if (!customerPhone) return alert("Phone number is required.");
+
+      const customerStage = prompt("Enter your Location / Stage:");
+      if (!customerStage) return alert("Location is required.");
+
+      const res = await fetchFromWorker({
+        func: 'sendRequestSMS',
+        driverNID: driver.NID || driver.NationalID || driver.Phone,
+        customerName,
+        customerPhone,
+        customerStage
+      });
+      alert(res.message);
+    }
+
+    window.onload = loadCounties;
+  </script>
+</body>
+</html>
